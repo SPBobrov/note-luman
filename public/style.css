@@ -1,0 +1,199 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+header {
+    background-color: #2c3e50;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+.main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.tree-panel {
+    width: 300px;
+    background-color: #ecf0f1;
+    padding: 1rem;
+    overflow-y: auto;
+    border-right: 1px solid #bdc3c7;
+    display: flex;
+    flex-direction: column;
+}
+
+.tree-panel h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+
+#tree-container {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 0.5rem;
+}
+
+#tree-container ul {
+    list-style: none;
+    padding-left: 1rem;
+}
+
+#tree-container li {
+    margin: 0.2rem 0;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+}
+
+#tree-container li:hover {
+    background-color: #bdc3c7;
+}
+
+#tree-container li.selected {
+    background-color: #3498db;
+    color: white;
+}
+
+.editor-panel {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    background-color: white;
+}
+
+#editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.note-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+#note-ref {
+    background-color: #3498db;
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    margin-right: 0.5rem;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+#note-title {
+    flex: 1;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    border: 1px solid #bdc3c7;
+    border-radius: 3px;
+}
+
+#note-content {
+    flex: 1;
+    padding: 0.5rem;
+    font-family: monospace;
+    font-size: 1rem;
+    border: 1px solid #bdc3c7;
+    border-radius: 3px;
+    resize: none;
+    margin-bottom: 1rem;
+}
+
+.editor-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+button {
+    padding: 0.5rem 1rem;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+button#delete-note {
+    background-color: #e74c3c;
+}
+
+button#delete-note:hover {
+    background-color: #c0392b;
+}
+
+footer {
+    background-color: #34495e;
+    color: white;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* Модальное окно */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 5px;
+    min-width: 400px;
+    max-width: 600px;
+}
+
+.close {
+    float: right;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+#parent-select {
+    width: 100%;
+    padding: 0.3rem;
+    margin-top: 0.3rem;
+}

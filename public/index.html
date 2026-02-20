@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zettelkasten по Луману</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>📝 Zettelkasten</h1>
+        </header>
+        <main class="main">
+            <div class="tree-panel">
+                <h2>Дерево заметок</h2>
+                <button id="new-note-root">+ Новая заметка верхнего уровня</button>
+                <div id="tree-container">
+                    <!-- Дерево будет строиться здесь -->
+                </div>
+            </div>
+            <div class="editor-panel">
+                <div id="editor-placeholder">Выберите заметку или создайте новую</div>
+                <div id="editor" style="display: none;">
+                    <div class="note-header">
+                        <span id="note-ref"></span>
+                        <input type="text" id="note-title" placeholder="Название заметки">
+                    </div>
+                    <textarea id="note-content" placeholder="Содержание заметки..."></textarea>
+                    <div class="editor-actions">
+                        <button id="save-note">Сохранить</button>
+                        <button id="delete-note">Удалить</button>
+                        <button id="new-child">+ Дочерняя заметка</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <footer>
+            Версия приложения: v0.1
+        </footer>
+    </div>
+
+    <!-- Модальное окно для создания новой заметки -->
+    <div id="modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Создать новую заметку</h3>
+            <form id="new-note-form">
+                <div class="form-group">
+                    <label for="new-title">Название:</label>
+                    <input type="text" id="new-title" required>
+                </div>
+                <div class="form-group">
+                    <label>Родитель:</label>
+                    <div>
+                        <label><input type="radio" name="parent-type" value="root" checked> Верхний уровень</label>
+                    </div>
+                    <div>
+                        <label><input type="radio" name="parent-type" value="existing"> Выбрать из дерева</label>
+                        <select id="parent-select" disabled>
+                            <option value="">-- выберите родителя --</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit">Создать</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
