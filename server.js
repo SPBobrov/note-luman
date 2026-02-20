@@ -27,12 +27,51 @@ db.run(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (parent_id) REFERENCES notes(id) ON DELETE CASCADE
   )
-`);
+`, (err) => {
+    if (err) {
+        console.error('Error creating table:', err);
+    } else {
+        console.log('Table notes is ready.');
+        // Миграция: проверяем, есть ли колонка type (если таблица существовала раньше)
+        db.all("PRAGMA table_info(notes)", (err, columns) => {
+            if (err) {
+                console.error('Error checking schema:', err);
+                return;
+            }
+            const hasType = columns.some(col => col.name === 'type');
+            if (!hasType) {
+                console.log('Migrating database: adding column "type"...');
+                db.run("ALTER TABLE notes ADD COLUMN type TEXT NOT NULL DEFAULT 'note'", (err) => {
+                    if (err) {
+                        console.error('Error adding type column:', err);
+                    } else {
+                        console.log('Column "type" added. Updating old notes...');
+                        db.run("UPDATE notes SET type = 'note' WHERE type IS NULL", (err) => {
+                            if (err) {
+                                console.error('Error updating old notes:', err);
+                            } else {
+                                console.log('Migration complete. Old notes now have type "note".');
+                            }
+                        });
+                    }
+                });
+            } else {
+                // Если колонка уже есть, убедимся, что у старых записей (если вдруг NULL) проставлен тип
+                db.run("UPDATE notes SET type = 'note' WHERE type IS NULL", (err) => {
+                    if (err) {
+                        console.error('Error updating notes with NULL type:', err);
+                    } else {
+                        console.log('Checked for NULL types — done.');
+                    }
+                });
+            }
+        });
+    }
+});
 
 // Вспомогательная функция для генерации ref
 function generateRef(type, parentId, callback) {
   if (type === 'bib') {
-    // Библиографическая заметка: B1, B2, ...
     db.get('SELECT MAX(order_index) as maxOrder FROM notes WHERE type = "bib"', (err, row) => {
       if (err) return callback(err);
       const newOrder = (row.maxOrder || 0) + 1;
@@ -40,16 +79,13 @@ function generateRef(type, parentId, callback) {
       callback(null, ref, newOrder);
     });
   } else {
-    // Обычная заметка (иерархическая)
     if (parentId === null || parentId === undefined) {
-      // Корневая заметка
       db.get('SELECT MAX(order_index) as maxOrder FROM notes WHERE type = "note" AND parent_id IS NULL', (err, row) => {
         if (err) return callback(err);
         const newOrder = (row.maxOrder || 0) + 1;
         callback(null, String(newOrder), newOrder);
       });
     } else {
-      // Дочерняя заметка
       db.get('SELECT order_index, ref FROM notes WHERE id = ?', [parentId], (err, parent) => {
         if (err) return callback(err);
         if (!parent) return callback(new Error('Parent not found'));
@@ -98,7 +134,7 @@ app.post('/api/notes', (req, res) => {
     res.status(400).json({ error: 'Title is required' });
     return;
   }
-  const noteType = type === 'bib' ? 'bib' : 'note'; // по умолчанию note
+  const noteType = type === 'bib' ? 'bib' : 'note';
 
   generateRef(noteType, parent_id, (err, ref, orderIndex) => {
     if (err) {
@@ -175,7 +211,6 @@ app.put('/api/notes/:id', (req, res) => {
 app.delete('/api/notes/:id', (req, res) => {
   const id = req.params.id;
 
-  // Проверяем наличие дочерних заметок
   db.get('SELECT COUNT(*) as count FROM notes WHERE parent_id = ?', [id], (err, row) => {
     if (err) {
       res.status(500).json({ error: err.message });
