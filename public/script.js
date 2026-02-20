@@ -364,7 +364,7 @@ previewBtn.addEventListener('click', () => {
 function renderPreview() {
     let content = noteContentTextarea.value;
 
-    // 1. Экранируем HTML-сущности, чтобы любой HTML-код отображался как текст
+    // 1. Экранируем HTML-сущности, чтобы любой HTML показывался как текст
     content = content
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -375,25 +375,27 @@ function renderPreview() {
     // 2. Выделение цветом ==текст==
     content = content.replace(/==(.*?)==/g, '<span class="highlight">$1</span>');
 
-    // 3. Внешние ссылки [текст](url)
-    content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    // 3. Внешние ссылки [текст](url) -> <a href="url" target="_blank">
+    content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+        // Дополнительное экранирование текста и URL
+        const safeText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeUrl = url.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeText}</a>`;
+    });
 
-    // 4. Авто-ссылки (http:// и https://)
-    const urlRegex = /(https?:\/\/[^\s<]+)/g;
-    content = content.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-
-    // 5. Внутренние ссылки [[ref]]
+    // 4. Внутренние ссылки [[ref]]
     const refRegex = /\[\[([\d.]+|B\d+)\]\]/g;
     content = content.replace(refRegex, (match, ref) => {
         const note = notes.find(n => n.ref === ref);
         if (note) {
-            return `<a href="#" class="note-link" data-ref="${ref}">[[${ref} ${note.title}]]</a>`;
+            const title = note.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<a href="#" class="note-link" data-ref="${ref}">[[${ref} ${title}]]</a>`;
         } else {
             return `<span style="color:red;">[[${ref} (не найдено)]]</span>`;
         }
     });
 
-    // 6. Цитаты: строки, начинающиеся с '> ' (после экранирования это '&gt; ')
+    // 5. Цитаты: строки, начинающиеся с '> ' (после экранирования это '&gt; ')
     const lines = content.split('\n');
     const newLines = [];
     let quoteBuffer = [];
@@ -401,7 +403,7 @@ function renderPreview() {
 
     for (const line of lines) {
         if (line.startsWith('&gt; ')) {
-            quoteBuffer.push(line.substring(5)); // удаляем '&gt; '
+            quoteBuffer.push(line.substring(5));
             inQuote = true;
         } else {
             if (inQuote) {
