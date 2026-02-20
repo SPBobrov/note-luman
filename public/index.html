@@ -13,10 +13,14 @@
         </header>
         <main class="main">
             <div class="tree-panel">
-                <h2>Дерево заметок</h2>
+                <h2>Библиография</h2>
+                <div id="bib-container">
+                    <!-- Список библиографических заметок -->
+                </div>
+                <h2>Заметки</h2>
                 <button id="new-note-root">+ Новая заметка верхнего уровня</button>
                 <div id="tree-container">
-                    <!-- Дерево будет строиться здесь -->
+                    <!-- Дерево заметок будет здесь -->
                 </div>
             </div>
             <div class="editor-panel">
@@ -27,16 +31,18 @@
                         <input type="text" id="note-title" placeholder="Название заметки">
                     </div>
                     <textarea id="note-content" placeholder="Содержание заметки..."></textarea>
+                    <div id="preview" style="display:none; border:1px solid #ccc; padding:1rem; overflow-y:auto; height:300px;"></div>
                     <div class="editor-actions">
                         <button id="save-note">Сохранить</button>
                         <button id="delete-note">Удалить</button>
-                        <button id="new-child">+ Дочерняя заметка</button>
+                        <button id="new-child" class="note-only">+ Дочерняя заметка</button>
+                        <button id="preview-btn">Предпросмотр</button>
                     </div>
                 </div>
             </div>
         </main>
         <footer>
-            Версия приложения: v0.1
+            Версия приложения: v0.2
         </footer>
     </div>
 
@@ -51,7 +57,16 @@
                     <input type="text" id="new-title" required>
                 </div>
                 <div class="form-group">
-                    <label>Родитель:</label>
+                    <label>Тип заметки:</label>
+                    <div>
+                        <label><input type="radio" name="note-type" value="note" checked> Обычная заметка</label>
+                    </div>
+                    <div>
+                        <label><input type="radio" name="note-type" value="bib"> Библиографическая</label>
+                    </div>
+                </div>
+                <div class="form-group" id="parent-group">
+                    <label>Родитель (для обычных заметок):</label>
                     <div>
                         <label><input type="radio" name="parent-type" value="root" checked> Верхний уровень</label>
                     </div>

@@ -20,6 +20,7 @@ db.run(`
     ref TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL,
     content TEXT,
+    type TEXT NOT NULL DEFAULT 'note',   -- 'note' или 'bib'
     parent_id INTEGER,
     order_index INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -29,32 +30,43 @@ db.run(`
 `);
 
 // Вспомогательная функция для генерации ref
-function generateRef(parentId, callback) {
-  if (parentId === null || parentId === undefined) {
-    // Корневая заметка
-    db.get('SELECT MAX(order_index) as maxOrder FROM notes WHERE parent_id IS NULL', (err, row) => {
+function generateRef(type, parentId, callback) {
+  if (type === 'bib') {
+    // Библиографическая заметка: B1, B2, ...
+    db.get('SELECT MAX(order_index) as maxOrder FROM notes WHERE type = "bib"', (err, row) => {
       if (err) return callback(err);
       const newOrder = (row.maxOrder || 0) + 1;
-      callback(null, String(newOrder), newOrder);
+      const ref = 'B' + newOrder;
+      callback(null, ref, newOrder);
     });
   } else {
-    // Дочерняя заметка
-    db.get('SELECT order_index, ref FROM notes WHERE id = ?', [parentId], (err, parent) => {
-      if (err) return callback(err);
-      if (!parent) return callback(new Error('Parent not found'));
-      db.get('SELECT MAX(order_index) as maxOrder FROM notes WHERE parent_id = ?', [parentId], (err, row) => {
+    // Обычная заметка (иерархическая)
+    if (parentId === null || parentId === undefined) {
+      // Корневая заметка
+      db.get('SELECT MAX(order_index) as maxOrder FROM notes WHERE type = "note" AND parent_id IS NULL', (err, row) => {
         if (err) return callback(err);
         const newOrder = (row.maxOrder || 0) + 1;
-        const newRef = parent.ref + '.' + newOrder;
-        callback(null, newRef, newOrder);
+        callback(null, String(newOrder), newOrder);
       });
-    });
+    } else {
+      // Дочерняя заметка
+      db.get('SELECT order_index, ref FROM notes WHERE id = ?', [parentId], (err, parent) => {
+        if (err) return callback(err);
+        if (!parent) return callback(new Error('Parent not found'));
+        db.get('SELECT MAX(order_index) as maxOrder FROM notes WHERE parent_id = ?', [parentId], (err, row) => {
+          if (err) return callback(err);
+          const newOrder = (row.maxOrder || 0) + 1;
+          const newRef = parent.ref + '.' + newOrder;
+          callback(null, newRef, newOrder);
+        });
+      });
+    }
   }
 }
 
 // API: получить все заметки
 app.get('/api/notes', (req, res) => {
-  db.all('SELECT * FROM notes ORDER BY ref', (err, rows) => {
+  db.all('SELECT * FROM notes ORDER BY type, ref', (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -81,27 +93,27 @@ app.get('/api/notes/:id', (req, res) => {
 
 // API: создать новую заметку
 app.post('/api/notes', (req, res) => {
-  const { title, parent_id } = req.body;
+  const { title, parent_id, type } = req.body;
   if (!title) {
     res.status(400).json({ error: 'Title is required' });
     return;
   }
+  const noteType = type === 'bib' ? 'bib' : 'note'; // по умолчанию note
 
-  generateRef(parent_id, (err, ref, orderIndex) => {
+  generateRef(noteType, parent_id, (err, ref, orderIndex) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
 
     db.run(
-      'INSERT INTO notes (ref, title, content, parent_id, order_index) VALUES (?, ?, ?, ?, ?)',
-      [ref, title, '', parent_id || null, orderIndex],
+      'INSERT INTO notes (ref, title, content, type, parent_id, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+      [ref, title, '', noteType, noteType === 'note' ? (parent_id || null) : null, orderIndex],
       function(err) {
         if (err) {
           res.status(500).json({ error: err.message });
           return;
         }
-        // Возвращаем созданную заметку
         db.get('SELECT * FROM notes WHERE id = ?', [this.lastID], (err, newNote) => {
           if (err) {
             res.status(500).json({ error: err.message });

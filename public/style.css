@@ -197,3 +197,38 @@ footer {
     padding: 0.3rem;
     margin-top: 0.3rem;
 }
+
+/* Добавить стили для библиографического списка */
+#bib-container {
+    margin-bottom: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #bdc3c7;
+    padding: 0.5rem;
+    background-color: #f9f9f9;
+}
+
+#bib-container ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+#bib-container li {
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+#bib-container li:hover {
+    background-color: #bdc3c7;
+}
+
+#bib-container li.selected {
+    background-color: #3498db;
+    color: white;
+}
+
+/* Скрыть кнопку "Дочерняя заметка" для библио */
+.editor-actions .note-only {
+    display: inline-block;
+}
