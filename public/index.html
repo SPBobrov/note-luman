@@ -37,12 +37,13 @@
                         <button id="delete-note">Удалить</button>
                         <button id="new-child" class="note-only">+ Дочерняя заметка</button>
                         <button id="preview-btn">Предпросмотр</button>
+                        <button id="insert-link-btn">🔗 Вставить ссылку</button>
                     </div>
                 </div>
             </div>
         </main>
         <footer>
-            Версия приложения: v0.2
+            Версия приложения: v0.3
         </footer>
     </div>
 
@@ -83,5 +84,20 @@
     </div>
 
     <script src="script.js"></script>
+    <!-- Модальное окно для вставки ссылки -->
+<div id="link-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close-link">&times;</span>
+        <h3>Выберите заметку для ссылки</h3>
+        <div class="form-group">
+            <label for="link-search">Поиск:</label>
+            <input type="text" id="link-search" placeholder="Введите название или ref...">
+        </div>
+        <select id="link-select" size="10" style="width:100%; margin-bottom:1rem;">
+            <!-- будет заполнено скриптом -->
+        </select>
+        <button id="insert-link-confirm">Вставить ссылку</button>
+    </div>
+</div>
 </body>
 </html>

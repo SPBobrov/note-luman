@@ -18,7 +18,15 @@ const newChildBtn = document.getElementById('new-child');
 const previewBtn = document.getElementById('preview-btn');
 const newNoteRootBtn = document.getElementById('new-note-root');
 
-// Модальное окно
+// Элементы для вставки ссылки
+const insertLinkBtn = document.getElementById('insert-link-btn');
+const linkModal = document.getElementById('link-modal');
+const closeLink = document.querySelector('.close-link');
+const linkSearch = document.getElementById('link-search');
+const linkSelect = document.getElementById('link-select');
+const insertLinkConfirm = document.getElementById('insert-link-confirm');
+
+// Модальное окно создания заметки
 const modal = document.getElementById('modal');
 const closeModal = document.querySelector('.close');
 const newNoteForm = document.getElementById('new-note-form');
@@ -50,7 +58,6 @@ function renderBibList() {
     html += '</ul>';
     bibContainer.innerHTML = html;
 
-    // Подсветить выбранный элемент
     if (selectedNoteId && notesMap[selectedNoteId]?.type === 'bib') {
         const selectedLi = bibContainer.querySelector(`li[data-id="${selectedNoteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
@@ -71,12 +78,10 @@ function buildTree(parentId = null) {
 function renderTree() {
     const tree = buildTree(null);
     treeContainer.innerHTML = renderTreeNodes(tree);
-    // Подсветить выбранный элемент
     if (selectedNoteId && notesMap[selectedNoteId]?.type === 'note') {
         const selectedLi = document.querySelector(`#tree-container li[data-id="${selectedNoteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
     }
-    // Обновить выпадающий список в модалке
     updateParentSelect();
 }
 
@@ -110,7 +115,7 @@ function updateParentSelect() {
     parentSelect.innerHTML = options;
 }
 
-// Обработка кликов по дереву и списку библиографии (делегирование)
+// Обработка кликов по дереву и списку библиографии
 treeContainer.addEventListener('click', (e) => {
     const li = e.target.closest('li');
     if (!li) return;
@@ -131,7 +136,6 @@ async function selectNote(noteId) {
     const note = notesMap[noteId];
     if (!note) return;
 
-    // Сброс подсветки
     document.querySelectorAll('#tree-container li, #bib-container li').forEach(li => li.classList.remove('selected'));
     if (note.type === 'bib') {
         const selectedLi = bibContainer.querySelector(`li[data-id="${noteId}"]`);
@@ -141,12 +145,10 @@ async function selectNote(noteId) {
         if (selectedLi) selectedLi.classList.add('selected');
     }
 
-    // Заполняем редактор
     noteRefSpan.textContent = note.ref;
     noteTitleInput.value = note.title;
     noteContentTextarea.value = note.content || '';
 
-    // Показываем/скрываем кнопку "Дочерняя заметка" в зависимости от типа
     if (note.type === 'bib') {
         newChildBtn.style.display = 'none';
     } else {
@@ -217,16 +219,15 @@ newNoteRootBtn.addEventListener('click', () => {
 newChildBtn.addEventListener('click', () => {
     if (!selectedNoteId) return;
     const parentNote = notesMap[selectedNoteId];
-    if (parentNote.type === 'bib') return; // на всякий случай
+    if (parentNote.type === 'bib') return;
     openNewNoteModal('note', selectedNoteId);
 });
 
 // Открыть модалку создания заметки
 function openNewNoteModal(type = 'note', parentId = null) {
-    // Сброс формы
     newTitleInput.value = '';
     document.querySelector(`input[name="note-type"][value="${type}"]`).checked = true;
-    toggleParentGroup(); // обновить доступность полей родителя
+    toggleParentGroup();
 
     if (type === 'note' && parentId !== null) {
         document.querySelector('input[name="parent-type"][value="existing"]').checked = true;
@@ -246,12 +247,10 @@ function toggleParentGroup() {
     const selectedType = document.querySelector('input[name="note-type"]:checked').value;
     if (selectedType === 'bib') {
         parentGroup.style.display = 'none';
-        // Для библио родитель не нужен, сбрасываем
         document.querySelector('input[name="parent-type"][value="root"]').checked = true;
         parentSelect.disabled = true;
     } else {
         parentGroup.style.display = 'block';
-        // Восстанавливаем состояние по radio
         const parentType = document.querySelector('input[name="parent-type"]:checked').value;
         parentSelect.disabled = parentType !== 'existing';
     }
@@ -268,7 +267,7 @@ parentTypeRadios.forEach(radio => {
     });
 });
 
-// Закрыть модалку
+// Закрыть модалку создания
 closeModal.addEventListener('click', () => {
     modal.style.display = 'none';
 });
@@ -334,7 +333,6 @@ previewBtn.addEventListener('click', () => {
 
 function renderPreview() {
     let content = noteContentTextarea.value;
-    // Замена [[ref]] на ссылки
     const refRegex = /\[\[([\d.]+|B\d+)\]\]/g;
     content = content.replace(refRegex, (match, ref) => {
         const note = notes.find(n => n.ref === ref);
@@ -348,7 +346,6 @@ function renderPreview() {
     previewDiv.innerHTML = content;
 }
 
-// Обработка кликов по ссылкам в предпросмотре
 previewDiv.addEventListener('click', (e) => {
     const link = e.target.closest('a.note-link');
     if (!link) return;
@@ -358,6 +355,66 @@ previewDiv.addEventListener('click', (e) => {
     if (note) {
         selectNote(note.id);
     }
+});
+
+// ===== Вставка ссылки =====
+function populateLinkSelect(filter = '') {
+    const sortedNotes = [...notes].sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'bib' ? -1 : 1;
+        return a.ref.localeCompare(b.ref, undefined, {numeric: true});
+    });
+
+    let options = '';
+    sortedNotes.forEach(n => {
+        const text = `${n.ref} — ${n.title}`;
+        if (filter && !text.toLowerCase().includes(filter.toLowerCase())) return;
+        options += `<option value="${n.ref}">${text}</option>`;
+    });
+    linkSelect.innerHTML = options;
+}
+
+insertLinkBtn.addEventListener('click', () => {
+    populateLinkSelect();
+    linkModal.style.display = 'flex';
+    linkSearch.value = '';
+});
+
+linkSearch.addEventListener('input', () => {
+    populateLinkSelect(linkSearch.value);
+});
+
+closeLink.addEventListener('click', () => {
+    linkModal.style.display = 'none';
+});
+window.addEventListener('click', (e) => {
+    if (e.target === linkModal) linkModal.style.display = 'none';
+});
+
+function insertAtCursor(myField, myValue) {
+    if (document.selection) {
+        myField.focus();
+        const sel = document.selection.createRange();
+        sel.text = myValue;
+    } else if (myField.selectionStart || myField.selectionStart === 0) {
+        const startPos = myField.selectionStart;
+        const endPos = myField.selectionEnd;
+        myField.value = myField.value.substring(0, startPos) + myValue + myField.value.substring(endPos, myField.value.length);
+        myField.selectionStart = startPos + myValue.length;
+        myField.selectionEnd = startPos + myValue.length;
+    } else {
+        myField.value += myValue;
+    }
+    myField.focus();
+}
+
+insertLinkConfirm.addEventListener('click', () => {
+    const selectedRef = linkSelect.value;
+    if (!selectedRef) {
+        alert('Выберите заметку');
+        return;
+    }
+    insertAtCursor(noteContentTextarea, `[[${selectedRef}]]`);
+    linkModal.style.display = 'none';
 });
 
 // Инициализация
