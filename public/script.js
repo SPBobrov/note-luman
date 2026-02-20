@@ -18,7 +18,7 @@ const newChildBtn = document.getElementById('new-child');
 const previewBtn = document.getElementById('preview-btn');
 const newNoteRootBtn = document.getElementById('new-note-root');
 
-// Элементы для вставки ссылки
+// Элементы для вставки внутренней ссылки
 const insertLinkBtn = document.getElementById('insert-link-btn');
 const linkModal = document.getElementById('link-modal');
 const closeLink = document.querySelector('.close-link');
@@ -26,7 +26,15 @@ const linkSearch = document.getElementById('link-search');
 const linkSelect = document.getElementById('link-select');
 const insertLinkConfirm = document.getElementById('insert-link-confirm');
 
-// Элементы для форматирования (цитаты, выделение)
+// Элементы для внешней ссылки
+const insertExternalLinkBtn = document.getElementById('insert-external-link-btn');
+const externalLinkModal = document.getElementById('external-link-modal');
+const closeExternalLink = document.querySelector('.close-external-link');
+const externalLinkText = document.getElementById('external-link-text');
+const externalLinkUrl = document.getElementById('external-link-url');
+const insertExternalLinkConfirm = document.getElementById('insert-external-link-confirm');
+
+// Элементы для форматирования
 const quoteBtn = document.getElementById('insert-quote-btn');
 const highlightBtn = document.getElementById('insert-highlight-btn');
 
@@ -356,10 +364,25 @@ previewBtn.addEventListener('click', () => {
 function renderPreview() {
     let content = noteContentTextarea.value;
 
-    // 1. Выделение цветом ==текст==
+    // 1. Экранируем HTML-сущности, чтобы любой HTML-код отображался как текст
+    content = content
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    // 2. Выделение цветом ==текст==
     content = content.replace(/==(.*?)==/g, '<span class="highlight">$1</span>');
 
-    // 2. Ссылки [[ref]]
+    // 3. Внешние ссылки [текст](url)
+    content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // 4. Авто-ссылки (http:// и https://)
+    const urlRegex = /(https?:\/\/[^\s<]+)/g;
+    content = content.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // 5. Внутренние ссылки [[ref]]
     const refRegex = /\[\[([\d.]+|B\d+)\]\]/g;
     content = content.replace(refRegex, (match, ref) => {
         const note = notes.find(n => n.ref === ref);
@@ -370,15 +393,15 @@ function renderPreview() {
         }
     });
 
-    // 3. Цитаты: строки, начинающиеся с '> '
+    // 6. Цитаты: строки, начинающиеся с '> ' (после экранирования это '&gt; ')
     const lines = content.split('\n');
     const newLines = [];
     let quoteBuffer = [];
     let inQuote = false;
 
     for (const line of lines) {
-        if (line.startsWith('> ')) {
-            quoteBuffer.push(line.substring(2));
+        if (line.startsWith('&gt; ')) {
+            quoteBuffer.push(line.substring(5)); // удаляем '&gt; '
             inQuote = true;
         } else {
             if (inQuote) {
@@ -397,7 +420,7 @@ function renderPreview() {
     previewDiv.innerHTML = content;
 }
 
-// Обработка кликов по ссылкам в предпросмотре
+// Обработка кликов по ссылкам в предпросмотре (внутренние)
 previewDiv.addEventListener('click', (e) => {
     const link = e.target.closest('a.note-link');
     if (!link) return;
@@ -409,7 +432,7 @@ previewDiv.addEventListener('click', (e) => {
     }
 });
 
-// ==================== Вставка ссылки ====================
+// ==================== Вставка внутренней ссылки ====================
 function populateLinkSelect(filter = '') {
     const sortedNotes = [...notes].sort((a, b) => {
         if (a.type !== b.type) return a.type === 'bib' ? -1 : 1;
@@ -467,6 +490,36 @@ insertLinkConfirm.addEventListener('click', () => {
     }
     insertAtCursor(noteContentTextarea, `[[${selectedRef}]]`);
     linkModal.style.display = 'none';
+});
+
+// ==================== Вставка внешней ссылки ====================
+insertExternalLinkBtn.addEventListener('click', () => {
+    externalLinkText.value = '';
+    externalLinkUrl.value = '';
+    externalLinkModal.style.display = 'flex';
+});
+
+closeExternalLink.addEventListener('click', () => {
+    externalLinkModal.style.display = 'none';
+});
+window.addEventListener('click', (e) => {
+    if (e.target === externalLinkModal) externalLinkModal.style.display = 'none';
+});
+
+insertExternalLinkConfirm.addEventListener('click', () => {
+    const text = externalLinkText.value.trim();
+    let url = externalLinkUrl.value.trim();
+    if (!url) {
+        alert('Введите URL');
+        return;
+    }
+    // Добавляем https:// если нет протокола
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+    }
+    const markdown = text ? `[${text}](${url})` : url; // если текст не указан, вставляем просто URL
+    insertAtCursor(noteContentTextarea, markdown);
+    externalLinkModal.style.display = 'none';
 });
 
 // ==================== Форматирование: цитаты и выделение ====================
