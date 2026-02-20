@@ -26,6 +26,10 @@ const linkSearch = document.getElementById('link-search');
 const linkSelect = document.getElementById('link-select');
 const insertLinkConfirm = document.getElementById('insert-link-confirm');
 
+// Элементы для форматирования (цитаты, выделение)
+const quoteBtn = document.getElementById('insert-quote-btn');
+const highlightBtn = document.getElementById('insert-highlight-btn');
+
 // Модальное окно создания заметки
 const modal = document.getElementById('modal');
 const closeModal = document.querySelector('.close');
@@ -36,19 +40,29 @@ const parentGroup = document.getElementById('parent-group');
 const parentTypeRadios = document.querySelectorAll('input[name="parent-type"]');
 const parentSelect = document.getElementById('parent-select');
 
-let previewMode = false;
+let previewMode = false; // флаг режима предпросмотра
 
-// Загрузка заметок при старте
+// ==================== Загрузка данных ====================
 async function loadNotes() {
-    const response = await fetch('/api/notes');
-    notes = await response.json();
-    notesMap = {};
-    notes.forEach(n => notesMap[n.id] = n);
-    renderBibList();
-    renderTree();
+    console.log('📥 Загрузка заметок...');
+    try {
+        const response = await fetch('/api/notes');
+        if (!response.ok) {
+            console.error('❌ Ошибка загрузки, статус:', response.status);
+            return;
+        }
+        notes = await response.json();
+        console.log('✅ Заметки загружены:', notes);
+        notesMap = {};
+        notes.forEach(n => notesMap[n.id] = n);
+        renderBibList();
+        renderTree();
+    } catch (error) {
+        console.error('❌ Ошибка при загрузке:', error);
+    }
 }
 
-// Рендер списка библиографии
+// ==================== Рендер библиографии ====================
 function renderBibList() {
     const bibNotes = notes.filter(n => n.type === 'bib').sort((a, b) => a.order_index - b.order_index);
     let html = '<ul>';
@@ -56,15 +70,15 @@ function renderBibList() {
         html += `<li data-id="${n.id}" data-ref="${n.ref}">${n.ref} ${n.title}</li>`;
     });
     html += '</ul>';
-    bibContainer.innerHTML = html;
+    if (bibContainer) bibContainer.innerHTML = html;
 
     if (selectedNoteId && notesMap[selectedNoteId]?.type === 'bib') {
-        const selectedLi = bibContainer.querySelector(`li[data-id="${selectedNoteId}"]`);
+        const selectedLi = bibContainer?.querySelector(`li[data-id="${selectedNoteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
     }
 }
 
-// Рекурсивное построение дерева обычных заметок
+// ==================== Построение дерева заметок ====================
 function buildTree(parentId = null) {
     return notes
         .filter(n => n.type === 'note' && (n.parent_id || null) === parentId)
@@ -99,7 +113,7 @@ function renderTreeNodes(nodes) {
     return html;
 }
 
-// Обновить select с родителями (только обычные заметки)
+// Обновление выпадающего списка родителей (для модалки создания)
 function updateParentSelect() {
     let options = '<option value="">-- выберите родителя --</option>';
     function addOptions(nodes, prefix = '') {
@@ -112,54 +126,63 @@ function updateParentSelect() {
     }
     const tree = buildTree(null);
     addOptions(tree);
-    parentSelect.innerHTML = options;
+    if (parentSelect) parentSelect.innerHTML = options;
 }
 
-// Обработка кликов по дереву и списку библиографии
-treeContainer.addEventListener('click', (e) => {
-    const li = e.target.closest('li');
-    if (!li) return;
-    const noteId = parseInt(li.dataset.id);
-    if (noteId) selectNote(noteId);
-});
-
-bibContainer.addEventListener('click', (e) => {
-    const li = e.target.closest('li');
-    if (!li) return;
-    const noteId = parseInt(li.dataset.id);
-    if (noteId) selectNote(noteId);
-});
-
-// Выбор заметки для редактирования
+// ==================== Выбор заметки ====================
 async function selectNote(noteId) {
     selectedNoteId = noteId;
     const note = notesMap[noteId];
     if (!note) return;
 
+    // Сброс подсветки
     document.querySelectorAll('#tree-container li, #bib-container li').forEach(li => li.classList.remove('selected'));
     if (note.type === 'bib') {
-        const selectedLi = bibContainer.querySelector(`li[data-id="${noteId}"]`);
+        const selectedLi = bibContainer?.querySelector(`li[data-id="${noteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
     } else {
-        const selectedLi = treeContainer.querySelector(`li[data-id="${noteId}"]`);
+        const selectedLi = treeContainer?.querySelector(`li[data-id="${noteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
     }
 
+    // Заполнение редактора
     noteRefSpan.textContent = note.ref;
     noteTitleInput.value = note.title;
     noteContentTextarea.value = note.content || '';
 
-    if (note.type === 'bib') {
-        newChildBtn.style.display = 'none';
+    // Скрыть кнопку "Дочерняя заметка" для библиографии
+    newChildBtn.style.display = note.type === 'bib' ? 'none' : 'inline-block';
+
+    // Обновление отображения в зависимости от режима предпросмотра
+    if (previewMode) {
+        noteContentTextarea.style.display = 'none';
+        previewDiv.style.display = 'block';
+        renderPreview();
     } else {
-        newChildBtn.style.display = 'inline-block';
+        noteContentTextarea.style.display = 'block';
+        previewDiv.style.display = 'none';
     }
 
     editorPlaceholder.style.display = 'none';
     editorDiv.style.display = 'flex';
 }
 
-// Сохранение изменений заметки
+// ==================== Обработчики кликов по дереву ====================
+treeContainer?.addEventListener('click', (e) => {
+    const li = e.target.closest('li');
+    if (!li) return;
+    const noteId = parseInt(li.dataset.id);
+    if (noteId) selectNote(noteId);
+});
+
+bibContainer?.addEventListener('click', (e) => {
+    const li = e.target.closest('li');
+    if (!li) return;
+    const noteId = parseInt(li.dataset.id);
+    if (noteId) selectNote(noteId);
+});
+
+// ==================== Сохранение заметки ====================
 saveBtn.addEventListener('click', async () => {
     if (!selectedNoteId) return;
     const title = noteTitleInput.value.trim();
@@ -184,13 +207,18 @@ saveBtn.addEventListener('click', async () => {
         noteRefSpan.textContent = updatedNote.ref;
         noteTitleInput.value = updatedNote.title;
         noteContentTextarea.value = updatedNote.content || '';
+
+        // Если мы в режиме предпросмотра, обновить предпросмотр
+        if (previewMode) {
+            renderPreview();
+        }
     } else {
         const err = await response.json();
         alert('Ошибка сохранения: ' + err.error);
     }
 });
 
-// Удаление заметки
+// ==================== Удаление заметки ====================
 deleteBtn.addEventListener('click', async () => {
     if (!selectedNoteId) return;
     if (!confirm('Вы уверены, что хотите удалить эту заметку? (У неё не должно быть дочерних)')) return;
@@ -210,12 +238,11 @@ deleteBtn.addEventListener('click', async () => {
     }
 });
 
-// Новая заметка верхнего уровня (обычная)
+// ==================== Создание новой заметки ====================
 newNoteRootBtn.addEventListener('click', () => {
     openNewNoteModal('note', null);
 });
 
-// Новая дочерняя заметка
 newChildBtn.addEventListener('click', () => {
     if (!selectedNoteId) return;
     const parentNote = notesMap[selectedNoteId];
@@ -223,7 +250,6 @@ newChildBtn.addEventListener('click', () => {
     openNewNoteModal('note', selectedNoteId);
 });
 
-// Открыть модалку создания заметки
 function openNewNoteModal(type = 'note', parentId = null) {
     newTitleInput.value = '';
     document.querySelector(`input[name="note-type"][value="${type}"]`).checked = true;
@@ -242,7 +268,6 @@ function openNewNoteModal(type = 'note', parentId = null) {
     modal.style.display = 'flex';
 }
 
-// Включение/отключение полей родителя в зависимости от типа заметки
 function toggleParentGroup() {
     const selectedType = document.querySelector('input[name="note-type"]:checked').value;
     if (selectedType === 'bib') {
@@ -256,7 +281,6 @@ function toggleParentGroup() {
     }
 }
 
-// События для типа заметки в модалке
 noteTypeRadios.forEach(radio => {
     radio.addEventListener('change', toggleParentGroup);
 });
@@ -267,7 +291,6 @@ parentTypeRadios.forEach(radio => {
     });
 });
 
-// Закрыть модалку создания
 closeModal.addEventListener('click', () => {
     modal.style.display = 'none';
 });
@@ -275,7 +298,6 @@ window.addEventListener('click', (e) => {
     if (e.target === modal) modal.style.display = 'none';
 });
 
-// Отправка формы создания заметки
 newNoteForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -316,7 +338,7 @@ newNoteForm.addEventListener('submit', async (e) => {
     }
 });
 
-// Предпросмотр
+// ==================== Предпросмотр ====================
 previewBtn.addEventListener('click', () => {
     previewMode = !previewMode;
     if (previewMode) {
@@ -333,6 +355,11 @@ previewBtn.addEventListener('click', () => {
 
 function renderPreview() {
     let content = noteContentTextarea.value;
+
+    // 1. Выделение цветом ==текст==
+    content = content.replace(/==(.*?)==/g, '<span class="highlight">$1</span>');
+
+    // 2. Ссылки [[ref]]
     const refRegex = /\[\[([\d.]+|B\d+)\]\]/g;
     content = content.replace(refRegex, (match, ref) => {
         const note = notes.find(n => n.ref === ref);
@@ -342,10 +369,35 @@ function renderPreview() {
             return `<span style="color:red;">[[${ref} (не найдено)]]</span>`;
         }
     });
-    content = content.replace(/\n/g, '<br>');
+
+    // 3. Цитаты: строки, начинающиеся с '> '
+    const lines = content.split('\n');
+    const newLines = [];
+    let quoteBuffer = [];
+    let inQuote = false;
+
+    for (const line of lines) {
+        if (line.startsWith('> ')) {
+            quoteBuffer.push(line.substring(2));
+            inQuote = true;
+        } else {
+            if (inQuote) {
+                newLines.push('<blockquote>' + quoteBuffer.join('<br>') + '</blockquote>');
+                quoteBuffer = [];
+                inQuote = false;
+            }
+            newLines.push(line);
+        }
+    }
+    if (inQuote) {
+        newLines.push('<blockquote>' + quoteBuffer.join('<br>') + '</blockquote>');
+    }
+
+    content = newLines.join('<br>');
     previewDiv.innerHTML = content;
 }
 
+// Обработка кликов по ссылкам в предпросмотре
 previewDiv.addEventListener('click', (e) => {
     const link = e.target.closest('a.note-link');
     if (!link) return;
@@ -357,11 +409,11 @@ previewDiv.addEventListener('click', (e) => {
     }
 });
 
-// ===== Вставка ссылки =====
+// ==================== Вставка ссылки ====================
 function populateLinkSelect(filter = '') {
     const sortedNotes = [...notes].sort((a, b) => {
         if (a.type !== b.type) return a.type === 'bib' ? -1 : 1;
-        return a.ref.localeCompare(b.ref, undefined, {numeric: true});
+        return a.ref.localeCompare(b.ref, undefined, { numeric: true });
     });
 
     let options = '';
@@ -417,5 +469,26 @@ insertLinkConfirm.addEventListener('click', () => {
     linkModal.style.display = 'none';
 });
 
-// Инициализация
-loadNotes();
+// ==================== Форматирование: цитаты и выделение ====================
+quoteBtn.addEventListener('click', () => {
+    insertAtCursor(noteContentTextarea, '> ');
+});
+
+function wrapSelection(before, after) {
+    const textarea = noteContentTextarea;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    const newText = before + selectedText + after;
+    textarea.value = textarea.value.substring(0, start) + newText + textarea.value.substring(end);
+    textarea.selectionStart = start + before.length;
+    textarea.selectionEnd = start + before.length + selectedText.length;
+    textarea.focus();
+}
+
+highlightBtn.addEventListener('click', () => {
+    wrapSelection('==', '==');
+});
+
+// ==================== Инициализация ====================
+document.addEventListener('DOMContentLoaded', loadNotes);

@@ -38,12 +38,14 @@
                         <button id="new-child" class="note-only">+ Дочерняя заметка</button>
                         <button id="preview-btn">Предпросмотр</button>
                         <button id="insert-link-btn">🔗 Вставить ссылку</button>
+                        <button id="insert-quote-btn">❝ Цитата</button>
+                        <button id="insert-highlight-btn">🎨 Выделить</button>
                     </div>
                 </div>
             </div>
         </main>
         <footer>
-            Версия приложения: v0.3
+            Версия приложения: v0.4.1
         </footer>
     </div>
 
@@ -83,7 +85,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
     <!-- Модальное окно для вставки ссылки -->
 <div id="link-modal" class="modal" style="display: none;">
     <div class="modal-content">
@@ -93,11 +94,13 @@
             <label for="link-search">Поиск:</label>
             <input type="text" id="link-search" placeholder="Введите название или ref...">
         </div>
-        <select id="link-select" size="10" style="width:100%; margin-bottom:1rem;">
-            <!-- будет заполнено скриптом -->
-        </select>
+        <select id="link-select" size="10" style="width:100%; margin-bottom:1rem;"></select>
         <button id="insert-link-confirm">Вставить ссылку</button>
     </div>
 </div>
+
+    <script src="script.js"></script>
+
+   
 </body>
 </html>

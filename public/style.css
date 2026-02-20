@@ -232,3 +232,34 @@ footer {
 .editor-actions .note-only {
     display: inline-block;
 }
+
+.note-link {
+    color: blue;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.note-link:hover {
+    color: darkblue;
+}
+
+.note-link:visited {
+    color: purple;
+}
+
+/* Цитаты */
+blockquote {
+    border-left: 4px solid #ccc;
+    padding-left: 10px;
+    margin: 1em 0;
+    color: #555;
+    font-style: italic;
+    background-color: #f9f9f9;
+}
+
+/* Выделение цветом */
+.highlight {
+    background-color: yellow;
+    color: black;
+    font-weight: normal;
+}
