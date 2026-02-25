@@ -2,6 +2,7 @@
 let notes = [];
 let selectedNoteId = null;
 let notesMap = {};
+let hasUnsavedChanges = false;   // флаг наличия несохранённых изменений
 
 // DOM элементы
 const treeContainer = document.getElementById('tree-container');
@@ -137,8 +138,57 @@ function updateParentSelect() {
     if (parentSelect) parentSelect.innerHTML = options;
 }
 
+// ==================== Автосохранение ====================
+// Функция сохранения текущей заметки (если есть изменения)
+async function saveCurrentNote() {
+    if (!selectedNoteId || !hasUnsavedChanges) return false;
+
+    const title = noteTitleInput.value.trim();
+    const content = noteContentTextarea.value;
+    if (!title) {
+        alert('Название не может быть пустым. Сохранение отменено.');
+        return false;
+    }
+
+    const response = await fetch(`/api/notes/${selectedNoteId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content })
+    });
+
+    if (response.ok) {
+        const updatedNote = await response.json();
+        const index = notes.findIndex(n => n.id === updatedNote.id);
+        if (index !== -1) notes[index] = updatedNote;
+        notesMap[updatedNote.id] = updatedNote;
+        renderBibList();
+        renderTree();
+        noteRefSpan.textContent = updatedNote.ref;
+        noteTitleInput.value = updatedNote.title;
+        noteContentTextarea.value = updatedNote.content || '';
+        hasUnsavedChanges = false; // сброс флага
+        console.log('✅ Автосохранение выполнено');
+        return true;
+    } else {
+        const err = await response.json();
+        alert('Ошибка автосохранения: ' + err.error);
+        return false;
+    }
+}
+
+// Слушатели изменений в полях
+noteTitleInput.addEventListener('input', () => {
+    hasUnsavedChanges = true;
+});
+noteContentTextarea.addEventListener('input', () => {
+    hasUnsavedChanges = true;
+});
+
 // ==================== Выбор заметки ====================
 async function selectNote(noteId) {
+    // Сначала сохраняем текущую заметку (если есть изменения)
+    await saveCurrentNote();
+
     selectedNoteId = noteId;
     const note = notesMap[noteId];
     if (!note) return;
@@ -173,6 +223,7 @@ async function selectNote(noteId) {
 
     editorPlaceholder.style.display = 'none';
     editorDiv.style.display = 'flex';
+    hasUnsavedChanges = false; // только что загрузили, изменений нет
 }
 
 // ==================== Обработчики кликов по дереву ====================
@@ -190,40 +241,9 @@ bibContainer?.addEventListener('click', (e) => {
     if (noteId) selectNote(noteId);
 });
 
-// ==================== Сохранение заметки ====================
+// ==================== Сохранение по кнопке ====================
 saveBtn.addEventListener('click', async () => {
-    if (!selectedNoteId) return;
-    const title = noteTitleInput.value.trim();
-    const content = noteContentTextarea.value;
-    if (!title) {
-        alert('Название не может быть пустым');
-        return;
-    }
-
-    const response = await fetch(`/api/notes/${selectedNoteId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content })
-    });
-    if (response.ok) {
-        const updatedNote = await response.json();
-        const index = notes.findIndex(n => n.id === updatedNote.id);
-        if (index !== -1) notes[index] = updatedNote;
-        notesMap[updatedNote.id] = updatedNote;
-        renderBibList();
-        renderTree();
-        noteRefSpan.textContent = updatedNote.ref;
-        noteTitleInput.value = updatedNote.title;
-        noteContentTextarea.value = updatedNote.content || '';
-
-        // Если мы в режиме предпросмотра, обновить предпросмотр
-        if (previewMode) {
-            renderPreview();
-        }
-    } else {
-        const err = await response.json();
-        alert('Ошибка сохранения: ' + err.error);
-    }
+    await saveCurrentNote(); // используем общую функцию
 });
 
 // ==================== Удаление заметки ====================
@@ -236,6 +256,7 @@ deleteBtn.addEventListener('click', async () => {
         notes = notes.filter(n => n.id !== selectedNoteId);
         delete notesMap[selectedNoteId];
         selectedNoteId = null;
+        hasUnsavedChanges = false; // заметка удалена
         renderBibList();
         renderTree();
         editorDiv.style.display = 'none';
@@ -364,7 +385,7 @@ previewBtn.addEventListener('click', () => {
 function renderPreview() {
     let content = noteContentTextarea.value;
 
-    // 1. Экранируем HTML-сущности, чтобы любой HTML показывался как текст
+    // 1. Экранируем HTML-сущности
     content = content
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -375,9 +396,8 @@ function renderPreview() {
     // 2. Выделение цветом ==текст==
     content = content.replace(/==(.*?)==/g, '<span class="highlight">$1</span>');
 
-    // 3. Внешние ссылки [текст](url) -> <a href="url" target="_blank">
+    // 3. Внешние ссылки [текст](url)
     content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
-        // Дополнительное экранирование текста и URL
         const safeText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const safeUrl = url.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeText}</a>`;
@@ -492,6 +512,7 @@ insertLinkConfirm.addEventListener('click', () => {
     }
     insertAtCursor(noteContentTextarea, `[[${selectedRef}]]`);
     linkModal.style.display = 'none';
+    hasUnsavedChanges = true; // после вставки ссылки изменения есть
 });
 
 // ==================== Вставка внешней ссылки ====================
@@ -515,18 +536,19 @@ insertExternalLinkConfirm.addEventListener('click', () => {
         alert('Введите URL');
         return;
     }
-    // Добавляем https:// если нет протокола
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
     }
-    const markdown = text ? `[${text}](${url})` : url; // если текст не указан, вставляем просто URL
+    const markdown = text ? `[${text}](${url})` : url;
     insertAtCursor(noteContentTextarea, markdown);
     externalLinkModal.style.display = 'none';
+    hasUnsavedChanges = true;
 });
 
 // ==================== Форматирование: цитаты и выделение ====================
 quoteBtn.addEventListener('click', () => {
     insertAtCursor(noteContentTextarea, '> ');
+    hasUnsavedChanges = true;
 });
 
 function wrapSelection(before, after) {
@@ -543,6 +565,7 @@ function wrapSelection(before, after) {
 
 highlightBtn.addEventListener('click', () => {
     wrapSelection('==', '==');
+    hasUnsavedChanges = true;
 });
 
 // ==================== Инициализация ====================
