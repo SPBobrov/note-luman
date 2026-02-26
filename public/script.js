@@ -2,7 +2,9 @@
 let notes = [];
 let selectedNoteId = null;
 let notesMap = {};
-let hasUnsavedChanges = false;   // флаг наличия несохранённых изменений
+let hasUnsavedChanges = false;
+let searchText = '';          // текущий поисковый запрос
+let searchActive = false;     // флаг активного поиска
 
 // DOM элементы
 const treeContainer = document.getElementById('tree-container');
@@ -18,6 +20,9 @@ const deleteBtn = document.getElementById('delete-note');
 const newChildBtn = document.getElementById('new-child');
 const previewBtn = document.getElementById('preview-btn');
 const newNoteRootBtn = document.getElementById('new-note-root');
+
+// Поиск
+const searchInput = document.getElementById('search-input');
 
 // Элементы для вставки внутренней ссылки
 const insertLinkBtn = document.getElementById('insert-link-btn');
@@ -71,23 +76,40 @@ async function loadNotes() {
     }
 }
 
+// ==================== Фильтрация по поиску ====================
+function getFilteredNotes() {
+    if (!searchText.trim()) {
+        searchActive = false;
+        return { bibNotes: notes.filter(n => n.type === 'bib'), noteNotes: notes.filter(n => n.type === 'note') };
+    }
+    searchActive = true;
+    const lowerSearch = searchText.toLowerCase();
+    const filtered = notes.filter(n => n.title.toLowerCase().includes(lowerSearch));
+    return {
+        bibNotes: filtered.filter(n => n.type === 'bib'),
+        noteNotes: filtered.filter(n => n.type === 'note')
+    };
+}
+
 // ==================== Рендер библиографии ====================
 function renderBibList() {
-    const bibNotes = notes.filter(n => n.type === 'bib').sort((a, b) => a.order_index - b.order_index);
+    if (!bibContainer) return;
+
+    const { bibNotes } = getFilteredNotes();
     let html = '<ul>';
     bibNotes.forEach(n => {
         html += `<li data-id="${n.id}" data-ref="${n.ref}">${n.ref} ${n.title}</li>`;
     });
     html += '</ul>';
-    if (bibContainer) bibContainer.innerHTML = html;
+    bibContainer.innerHTML = html;
 
     if (selectedNoteId && notesMap[selectedNoteId]?.type === 'bib') {
-        const selectedLi = bibContainer?.querySelector(`li[data-id="${selectedNoteId}"]`);
+        const selectedLi = bibContainer.querySelector(`li[data-id="${selectedNoteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
     }
 }
 
-// ==================== Построение дерева заметок ====================
+// ==================== Построение дерева заметок (обычное или плоское при поиске) ====================
 function buildTree(parentId = null) {
     return notes
         .filter(n => n.type === 'note' && (n.parent_id || null) === parentId)
@@ -99,10 +121,26 @@ function buildTree(parentId = null) {
 }
 
 function renderTree() {
-    const tree = buildTree(null);
-    treeContainer.innerHTML = renderTreeNodes(tree);
+    if (!treeContainer) return;
+
+    const { noteNotes } = getFilteredNotes();
+
+    if (searchActive) {
+        // Плоский список результатов поиска
+        let html = '<ul>';
+        noteNotes.forEach(n => {
+            html += `<li data-id="${n.id}" data-ref="${n.ref}">${n.ref} ${n.title}</li>`;
+        });
+        html += '</ul>';
+        treeContainer.innerHTML = html;
+    } else {
+        // Обычное дерево
+        const tree = buildTree(null);
+        treeContainer.innerHTML = renderTreeNodes(tree);
+    }
+
     if (selectedNoteId && notesMap[selectedNoteId]?.type === 'note') {
-        const selectedLi = document.querySelector(`#tree-container li[data-id="${selectedNoteId}"]`);
+        const selectedLi = treeContainer.querySelector(`li[data-id="${selectedNoteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
     }
     updateParentSelect();
@@ -124,6 +162,7 @@ function renderTreeNodes(nodes) {
 
 // Обновление выпадающего списка родителей (для модалки создания)
 function updateParentSelect() {
+    if (!parentSelect) return;
     let options = '<option value="">-- выберите родителя --</option>';
     function addOptions(nodes, prefix = '') {
         nodes.forEach(node => {
@@ -135,11 +174,10 @@ function updateParentSelect() {
     }
     const tree = buildTree(null);
     addOptions(tree);
-    if (parentSelect) parentSelect.innerHTML = options;
+    parentSelect.innerHTML = options;
 }
 
 // ==================== Автосохранение ====================
-// Функция сохранения текущей заметки (если есть изменения)
 async function saveCurrentNote() {
     if (!selectedNoteId || !hasUnsavedChanges) return false;
 
@@ -166,7 +204,7 @@ async function saveCurrentNote() {
         noteRefSpan.textContent = updatedNote.ref;
         noteTitleInput.value = updatedNote.title;
         noteContentTextarea.value = updatedNote.content || '';
-        hasUnsavedChanges = false; // сброс флага
+        hasUnsavedChanges = false;
         console.log('✅ Автосохранение выполнено');
         return true;
     } else {
@@ -186,8 +224,17 @@ noteContentTextarea.addEventListener('input', () => {
 
 // ==================== Выбор заметки ====================
 async function selectNote(noteId) {
-    // Сначала сохраняем текущую заметку (если есть изменения)
+    // Сначала сохраняем текущую заметку
     await saveCurrentNote();
+
+    // Если был активен поиск, очищаем его и восстанавливаем полные списки
+    if (searchActive || searchText.trim() !== '') {
+        searchInput.value = '';
+        searchText = '';
+        searchActive = false;
+        renderBibList();
+        renderTree();
+    }
 
     selectedNoteId = noteId;
     const note = notesMap[noteId];
@@ -195,6 +242,8 @@ async function selectNote(noteId) {
 
     // Сброс подсветки
     document.querySelectorAll('#tree-container li, #bib-container li').forEach(li => li.classList.remove('selected'));
+
+    // Подсветка выбранной заметки
     if (note.type === 'bib') {
         const selectedLi = bibContainer?.querySelector(`li[data-id="${noteId}"]`);
         if (selectedLi) selectedLi.classList.add('selected');
@@ -208,10 +257,8 @@ async function selectNote(noteId) {
     noteTitleInput.value = note.title;
     noteContentTextarea.value = note.content || '';
 
-    // Скрыть кнопку "Дочерняя заметка" для библиографии
     newChildBtn.style.display = note.type === 'bib' ? 'none' : 'inline-block';
 
-    // Обновление отображения в зависимости от режима предпросмотра
     if (previewMode) {
         noteContentTextarea.style.display = 'none';
         previewDiv.style.display = 'block';
@@ -223,10 +270,10 @@ async function selectNote(noteId) {
 
     editorPlaceholder.style.display = 'none';
     editorDiv.style.display = 'flex';
-    hasUnsavedChanges = false; // только что загрузили, изменений нет
+    hasUnsavedChanges = false;
 }
 
-// ==================== Обработчики кликов по дереву ====================
+// ==================== Обработчики кликов по дереву и библиографии ====================
 treeContainer?.addEventListener('click', (e) => {
     const li = e.target.closest('li');
     if (!li) return;
@@ -241,9 +288,16 @@ bibContainer?.addEventListener('click', (e) => {
     if (noteId) selectNote(noteId);
 });
 
+// ==================== Поиск ====================
+searchInput?.addEventListener('input', (e) => {
+    searchText = e.target.value;
+    renderBibList();
+    renderTree();
+});
+
 // ==================== Сохранение по кнопке ====================
 saveBtn.addEventListener('click', async () => {
-    await saveCurrentNote(); // используем общую функцию
+    await saveCurrentNote();
 });
 
 // ==================== Удаление заметки ====================
@@ -256,7 +310,7 @@ deleteBtn.addEventListener('click', async () => {
         notes = notes.filter(n => n.id !== selectedNoteId);
         delete notesMap[selectedNoteId];
         selectedNoteId = null;
-        hasUnsavedChanges = false; // заметка удалена
+        hasUnsavedChanges = false;
         renderBibList();
         renderTree();
         editorDiv.style.display = 'none';
@@ -512,7 +566,7 @@ insertLinkConfirm.addEventListener('click', () => {
     }
     insertAtCursor(noteContentTextarea, `[[${selectedRef}]]`);
     linkModal.style.display = 'none';
-    hasUnsavedChanges = true; // после вставки ссылки изменения есть
+    hasUnsavedChanges = true;
 });
 
 // ==================== Вставка внешней ссылки ====================
